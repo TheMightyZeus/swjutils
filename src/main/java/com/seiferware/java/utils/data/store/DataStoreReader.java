@@ -8,8 +8,8 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.TreeSet;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.LinkedTransferQueue;
@@ -103,7 +103,7 @@ import com.seiferware.java.utils.reflection.ClassReflection;
 public abstract class DataStoreReader {
 	private final Class<?>[] collectionClasses = {
 			ArrayList.class,
-			TreeSet.class,
+			HashSet.class,
 			LinkedList.class,
 			LinkedBlockingQueue.class,
 			LinkedBlockingDeque.class,
