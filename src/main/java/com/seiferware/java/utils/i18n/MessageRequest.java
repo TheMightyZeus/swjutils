@@ -3,8 +3,7 @@ package com.seiferware.java.utils.i18n;
 import java.util.Locale;
 
 /**
- * Used by {@link MessageParser} and {@link MessageSource} to pass information
- * about the message to be parsed.
+ * Used by {@link MessageParser} and {@link MessageSource} to pass information about the message to be parsed.
  */
 public class MessageRequest {
 	private MessageSource messageSource = null;
@@ -17,15 +16,16 @@ public class MessageRequest {
 	 * @param data
 	 *            The map of objects which can be referenced by placeholders.
 	 * @param locale
-	 *            The locale used to fetch the message from a resource bundle if
-	 *            necessary, and also used for formatting dates and such.
+	 *            The locale used to fetch the message from a resource bundle if necessary, and also used for formatting
+	 *            dates and such.
 	 * @param messageSource
-	 *            The message source being used. Especially important if any
-	 *            placeholder objects are other messages, or get parsed into
-	 *            other messages.
+	 *            The message source being used. Especially important if any placeholder objects are other messages, or
+	 *            get parsed into other messages.
 	 */
 	public MessageRequest(ArgMap data, Locale locale, MessageSource messageSource) {
-		this.data = data.getUnmodifiable();
+		if(data != null) {
+			this.data = data.getUnmodifiable();
+		}
 		this.locale = locale;
 		this.messageSource = messageSource;
 	}
