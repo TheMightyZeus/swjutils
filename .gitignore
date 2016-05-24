@@ -1,5 +1,6 @@
 *.class
 *.iml
+.gradle/
 .project
 .classpath
 .settings/
@@ -65,3 +66,6 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 /.idea/
+/gradlew
+/gradle/
+/gradlew.bat
