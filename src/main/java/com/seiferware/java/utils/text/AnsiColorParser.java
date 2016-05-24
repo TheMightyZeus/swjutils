@@ -1,9 +1,10 @@
 package com.seiferware.java.utils.text;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * A color parser suitable for sending color text to compatible telnet-style
- * clients.
+ * A color parser suitable for sending color text to compatible telnet-style clients.
  */
 public class AnsiColorParser implements ColorParser {
 	protected static final char ESCAPE_CHAR = '\u001b';
@@ -11,23 +12,41 @@ public class AnsiColorParser implements ColorParser {
 	protected final char bg;
 	protected boolean allowbg = true;
 	protected boolean allowfg = true;
-	
 	/**
 	 * Creates the parser.
-	 * 
+	 *
 	 * @param fg
-	 *            The character used to indicate the character that follows
-	 *            represents the intended foreground color.
+	 * 		The character used to indicate the character that follows represents the intended foreground color.
 	 * @param bg
-	 *            The character used to indicate the character that follows
-	 *            represents the intended background color.
+	 * 		The character used to indicate the character that follows represents the intended background color.
 	 */
 	public AnsiColorParser(char fg, char bg) {
 		this.fg = fg;
 		this.bg = bg;
 	}
+	@NotNull
+	protected static String getColorReset() {
+		return ESCAPE_CHAR + "[0m";
+	}
+	@NotNull
+	protected static String getColorSequence(@Nullable Color clr) {
+		return getColorSequence(clr, false);
+	}
+	@NotNull
+	protected static String getColorSequence(@Nullable Color clr, boolean background) {
+		if(clr == null) {
+			return "";
+		}
+		return ESCAPE_CHAR + "[" + (clr.getNum() + (background ? 40 : 30)) + (background ? "" : (clr.isBright() ? ";1" : ";22")) + "m";
+	}
+	@NotNull
 	@Override
-	public String parseColors(String data) {
+	public String getResetSequence() {
+		return fg + "x";
+	}
+	@NotNull
+	@Override
+	public String parseColors(@NotNull String data) {
 		StringBuilder sb = new StringBuilder(data);
 		String sfg = fg + "";
 		String sbg = bg + "";
@@ -55,17 +74,5 @@ public class AnsiColorParser implements ColorParser {
 			l = fgl < bgl && fgl != -1 || bgl == -1 ? fgl : bgl;
 		}
 		return sb.toString();
-	}
-	protected static String getColorReset() {
-		return ESCAPE_CHAR + "[0m";
-	}
-	protected static String getColorSequence(Color clr) {
-		return getColorSequence(clr, false);
-	}
-	protected static String getColorSequence(Color clr, boolean background) {
-		if(clr == null) {
-			return "";
-		}
-		return ESCAPE_CHAR + "[" + (clr.getNum() + (background ? 40 : 30)) + (clr.isBright() && !background ? ";1" : "") + "m";
 	}
 }

@@ -1,5 +1,7 @@
 package com.seiferware.java.utils.data;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
  * A simple class to hold two linked pieces of data.
  * 
@@ -24,7 +26,7 @@ public class KeyValuePair<K, V> {
 	 * @param value
 	 *            The value.
 	 */
-	public KeyValuePair(K key, V value) {
+	public KeyValuePair(@Nullable K key, @Nullable V value) {
 		this.key = key;
 		this.value = value;
 	}
@@ -33,6 +35,7 @@ public class KeyValuePair<K, V> {
 	 * 
 	 * @return The key.
 	 */
+	@Nullable
 	public K getKey() {
 		return key;
 	}
@@ -42,7 +45,7 @@ public class KeyValuePair<K, V> {
 	 * @param key
 	 *            The key.
 	 */
-	public void setKey(K key) {
+	public void setKey(@Nullable K key) {
 		this.key = key;
 	}
 	/**
@@ -50,6 +53,7 @@ public class KeyValuePair<K, V> {
 	 * 
 	 * @return The value.
 	 */
+	@Nullable
 	public V getValue() {
 		return value;
 	}
@@ -59,7 +63,7 @@ public class KeyValuePair<K, V> {
 	 * @param value
 	 *            The value.
 	 */
-	public void setValue(V value) {
+	public void setValue(@Nullable V value) {
 		this.value = value;
 	}
 	@Override

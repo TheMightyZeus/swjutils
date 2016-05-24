@@ -1,26 +1,25 @@
 package com.seiferware.java.utils.net;
 
-import java.net.Socket;
-
 import com.seiferware.java.utils.event.Event;
 import com.seiferware.java.utils.event.EventQueue;
 import com.seiferware.java.utils.event.net.SocketClosedEvent;
 import com.seiferware.java.utils.event.net.SocketConnectedEvent;
+import org.jetbrains.annotations.Nullable;
+
+import java.net.Socket;
 
 /**
- * A version of {@link SocketPool} that doesn't throw events, but rather
- * maintains a queue of opened and closed sockets, which can later be polled at
- * leisure.
+ * A version of {@link SocketPool} that doesn't throw events, but rather maintains a queue of opened and closed sockets,
+ * which can later be polled at leisure.
  */
 public class PollableSocketPool extends SocketPool {
-	protected EventQueue<SocketConnectedEvent, Socket> connectQueue = new EventQueue<>(SocketConnectedEvent.class, Socket.class);
-	protected EventQueue<SocketClosedEvent, Socket> disconnectQueue = new EventQueue<>(SocketClosedEvent.class, Socket.class);
-	
+	protected EventQueue<SocketConnectedEvent, SocketPool> connectQueue = new EventQueue<>(SocketConnectedEvent.class, SocketPool.class);
+	protected EventQueue<SocketClosedEvent, SocketPool> disconnectQueue = new EventQueue<>(SocketClosedEvent.class, SocketPool.class);
 	/**
 	 * Creates the pool, ready to listen on the specified port.
-	 * 
+	 *
 	 * @param port
-	 *            The port on which to listen.
+	 * 		The port on which to listen.
 	 */
 	public PollableSocketPool(int port) {
 		super(port);
@@ -28,31 +27,33 @@ public class PollableSocketPool extends SocketPool {
 		Event.addListener(this, disconnectQueue);
 	}
 	/**
-	 * Retrieves the next new connection, or {@code null} if no connections have
-	 * been opened since the queue was emptied.
-	 * 
-	 * @return The openedd connection.
+	 * Retrieves the next closed connection, or {@code null} if no connections have been closed since the queue was
+	 * emptied.
+	 *
+	 * @return The closed connection.
 	 */
-	public Socket getNewConnection() {
-		while(connectQueue.peek() != null) {
-			Event ev = connectQueue.poll();
-			if(ev instanceof SocketConnectedEvent) {
-				return (Socket)ev.getTarget();
+	@Nullable
+	public Socket getClosedConnection() {
+		while(disconnectQueue.peek() != null) {
+			SocketClosedEvent ev = disconnectQueue.poll();
+			if(ev != null) {
+				return ev.getSocket();
 			}
 		}
 		return null;
 	}
 	/**
-	 * Retrieves the next closed connection, or {@code null} if no connections
-	 * have been opened since the queue was emptied.
-	 * 
-	 * @return The closed connection.
+	 * Retrieves the next new connection, or {@code null} if no connections have been opened since the queue was
+	 * emptied.
+	 *
+	 * @return The opened connection.
 	 */
-	public Socket getClosedConnection() {
-		while(disconnectQueue.peek() != null) {
-			Event ev = disconnectQueue.poll();
-			if(ev instanceof SocketClosedEvent) {
-				return (Socket)ev.getTarget();
+	@Nullable
+	public Socket getNewConnection() {
+		while(connectQueue.peek() != null) {
+			SocketConnectedEvent ev = connectQueue.poll();
+			if(ev != null) {
+				return ev.getSocket();
 			}
 		}
 		return null;

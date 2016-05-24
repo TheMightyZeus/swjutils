@@ -1,17 +1,18 @@
 package com.seiferware.java.utils.turing;
 
+import com.seiferware.java.utils.turing.TuringMachine.TuringCommand;
+import com.seiferware.java.utils.turing.TuringMachine.TuringState;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Collections;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import com.seiferware.java.utils.turing.TuringMachine.TuringCommand;
-import com.seiferware.java.utils.turing.TuringMachine.TuringState;
-
 @SuppressWarnings("javadoc")
 public abstract class TuringMachineDisplay {
-	public abstract <E extends Enum<E>, M extends Enum<M>> void display(MachineState<E, M> state, boolean halted);
-	public final <E extends Enum<E>, M extends Enum<M>> void run(TuringMachine<E, M> machine) {
+	public abstract <E extends Enum<E>, M extends Enum<M>> void display(@NotNull MachineState<E, M> state, boolean halted);
+	public final <E extends Enum<E>, M extends Enum<M>> void run(@NotNull TuringMachine<E, M> machine) {
 		MachineState<E, M> state = new MachineState<>(machine);
 		while(!state.getFinalStates().contains(state.getCurrentState())) {
 			display(state, false);
@@ -28,20 +29,19 @@ public abstract class TuringMachineDisplay {
 			}
 			if(result.getMove() != null) {
 				switch(result.getMove()) {
-				case LEFT:
-					state.setCurrentIndex(state.getCurrentIndex() - 1);
-					break;
-				case RIGHT:
-					state.setCurrentIndex(state.getCurrentIndex() + 1);
-					break;
-				default:
-					break;
+					case LEFT:
+						state.setCurrentIndex(state.getCurrentIndex() - 1);
+						break;
+					case RIGHT:
+						state.setCurrentIndex(state.getCurrentIndex() + 1);
+						break;
+					default:
+						break;
 				}
 			}
 		}
 		display(state, true);
 	}
-	
 	public static class MachineState<E extends Enum<E>, M extends Enum<M>> {
 		private Class<E> symbolClass;
 		private Class<M> stateClass;
@@ -50,8 +50,7 @@ public abstract class TuringMachineDisplay {
 		private SortedMap<Long, E> tape;
 		private Set<M> finalStates;
 		private long currentIndex;
-		
-		public MachineState(TuringMachine<E, M> machine) {
+		public MachineState(@NotNull TuringMachine<E, M> machine) {
 			symbolClass = machine.getSymbols();
 			stateClass = machine.getStates();
 			blankSymbol = machine.getBlankSymbol();
@@ -59,26 +58,9 @@ public abstract class TuringMachineDisplay {
 			tape = new TreeMap<>();
 			finalStates = Collections.unmodifiableSet(machine.getFinalStates());
 		}
-		public M getCurrentState() {
-			return currentState;
-		}
-		public void setCurrentState(M currentState) {
-			this.currentState = currentState;
-		}
-		public Class<E> getSymbolClass() {
-			return symbolClass;
-		}
-		public Class<M> getStateClass() {
-			return stateClass;
-		}
+		@NotNull
 		public E getBlankSymbol() {
 			return blankSymbol;
-		}
-		public SortedMap<Long, E> getTape() {
-			return tape;
-		}
-		public Set<M> getFinalStates() {
-			return finalStates;
 		}
 		public long getCurrentIndex() {
 			return currentIndex;
@@ -86,6 +68,29 @@ public abstract class TuringMachineDisplay {
 		public void setCurrentIndex(long currentIndex) {
 			this.currentIndex = currentIndex;
 		}
+		@NotNull
+		public M getCurrentState() {
+			return currentState;
+		}
+		public void setCurrentState(@NotNull M currentState) {
+			this.currentState = currentState;
+		}
+		@NotNull
+		public E getCurrentSymbol() {
+			return getSymbolAt(currentIndex);
+		}
+		public void setCurrentSymbol(@NotNull E value) {
+			tape.put(currentIndex, value);
+		}
+		@NotNull
+		public Set<M> getFinalStates() {
+			return finalStates;
+		}
+		@NotNull
+		public Class<M> getStateClass() {
+			return stateClass;
+		}
+		@NotNull
 		public E getSymbolAt(long index) {
 			if(tape.containsKey(index)) {
 				return tape.get(index);
@@ -93,11 +98,13 @@ public abstract class TuringMachineDisplay {
 				return getBlankSymbol();
 			}
 		}
-		public E getCurrentSymbol() {
-			return getSymbolAt(currentIndex);
+		@NotNull
+		public Class<E> getSymbolClass() {
+			return symbolClass;
 		}
-		public void setCurrentSymbol(E value) {
-			tape.put(currentIndex, value);
+		@NotNull
+		public SortedMap<Long, E> getTape() {
+			return tape;
 		}
 	}
 }

@@ -1,16 +1,9 @@
 package com.seiferware.java.utils.userinterface;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.io.Reader;
-import java.io.Writer;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.io.*;
 
 /**
  * A text interface that internally uses a {@link StringBuffer}.
@@ -19,77 +12,75 @@ public class BufferedTextInterface implements ITextInterface {
 	protected BufferedReader in;
 	protected BufferedWriter out;
 	protected StringBuffer sb = new StringBuffer();
-	protected char[] chars = new char[32];
-	
 	/**
 	 * Creates the interface.
-	 * 
+	 *
 	 * @param in
-	 *            The input source.
+	 * 		The input source.
 	 * @param out
-	 *            The output destination.
+	 * 		The output destination.
 	 */
-	public BufferedTextInterface(Reader in, Writer out) {
+	public BufferedTextInterface(@NotNull Reader in, @NotNull Writer out) {
 		if(in instanceof BufferedReader) {
-			this.in = (BufferedReader)in;
+			this.in = (BufferedReader) in;
 		} else {
 			this.in = new BufferedReader(in);
 		}
 		if(out instanceof BufferedWriter) {
-			this.out = (BufferedWriter)out;
+			this.out = (BufferedWriter) out;
 		} else {
 			this.out = new BufferedWriter(out);
 		}
 	}
 	/**
 	 * Creates the interface.
-	 * 
+	 *
 	 * @param in
-	 *            The input source.
+	 * 		The input source.
 	 * @param out
-	 *            The output destination.
+	 * 		The output destination.
 	 */
-	public BufferedTextInterface(InputStream in, OutputStream out) {
+	public BufferedTextInterface(@NotNull InputStream in, @NotNull OutputStream out) {
 		this.in = new BufferedReader(new InputStreamReader(in));
 		this.out = new BufferedWriter(new OutputStreamWriter(out));
 	}
 	/**
 	 * Creates the interface.
-	 * 
+	 *
 	 * @param in
-	 *            The input source.
+	 * 		The input source.
 	 * @param out
-	 *            The output destination.
+	 * 		The output destination.
 	 */
-	public BufferedTextInterface(InputStream in, PrintStream out) {
+	public BufferedTextInterface(@NotNull InputStream in, @NotNull PrintStream out) {
 		this.in = new BufferedReader(new InputStreamReader(in));
 		this.out = new BufferedWriter(new PrintWriter(out));
 	}
-	protected void updateBuffer() {
+	@Override
+	public void close() {
 		try {
-			while(in.ready()) {
-				// in.read(chars);
-				// sb.append(chars);
-				sb.append((char)in.read());
-			}
-		} catch(IOException e) {}
+			in.close();
+		} catch (IOException ignored) {
+		}
+		try {
+			out.close();
+		} catch (IOException ignored) {
+		}
+		in = null;
+		out = null;
+		sb = null;
 	}
 	@Override
-	public void send(String data) {
-		try {
-			out.write(data);
-			out.flush();
-		} catch(IOException e) {}
+	public boolean hasLineToRead() {
+		updateBuffer();
+		return sb.indexOf("\n") != -1;
 	}
 	@Override
-	public void sendLine(String data) {
-		try {
-			out.write(data);
-			out.newLine();
-			out.flush();
-		} catch(IOException e) {}
+	public boolean isActive() {
+		return in != null && out != null;
 	}
 	@Override
+	@Nullable
 	public String readLine() {
 		updateBuffer();
 		int len = sb.indexOf("\r\n");
@@ -107,24 +98,40 @@ public class BufferedTextInterface implements ITextInterface {
 		return null;
 	}
 	@Override
-	public boolean hasLineToRead() {
-		updateBuffer();
-		return sb.indexOf("\n") != -1;
+	public void send(@NotNull String data) {
+		try {
+			out.write(data);
+			out.flush();
+		} catch (IOException ignored) {
+		}
 	}
 	@Override
-	public boolean isActive() {
-		return in != null && out != null;
+	public void send(@NotNull byte[] data) {
+		try {
+			for(byte b : data) {
+				out.write(Byte.toString(b));
+			}
+			out.flush();
+		} catch (IOException ignored) {
+		}
 	}
 	@Override
-	public void close() {
+	public void sendLine(@NotNull String data) {
 		try {
-			in.close();
-		} catch(IOException e) {}
+			out.write(data);
+			out.newLine();
+			out.flush();
+		} catch (IOException ignored) {
+		}
+	}
+	protected void updateBuffer() {
 		try {
-			out.close();
-		} catch(IOException e) {}
-		in = null;
-		out = null;
-		sb = null;
+			while(in != null && in.ready()) {
+				// in.read(chars);
+				// sb.append(chars);
+				sb.append((char) in.read());
+			}
+		} catch (IOException ignored) {
+		}
 	}
 }

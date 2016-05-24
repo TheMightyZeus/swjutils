@@ -1,23 +1,32 @@
 package com.seiferware.java.utils.text;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 /**
- * An interface for converting color indicators to implementation-specific color
- * directives.
+ * An interface for converting color indicators to implementation-specific color directives.
  */
 public interface ColorParser {
 	/**
+	 * Gets the character sequence needed to clear all special formatting for this implementation. Returns the empty
+	 * string if this implementation does not support formatting.
+	 *
+	 * @return The required character sequence, or the empty string.
+	 */
+	@NotNull String getResetSequence();
+	/**
 	 * Convert the provided string to an implementation-specific colored string.
-	 * 
+	 *
 	 * @param data
-	 *            The text to convert.
+	 * 		The text to convert.
+	 *
 	 * @return The converted text.
 	 */
-	public String parseColors(String data);
-	
+	@NotNull String parseColors(@NotNull String data);
 	/**
 	 * An enumeration representing the 16 basic colors.
 	 */
-	public static enum Color {
+	enum Color {
 		/**
 		 * Black {@code 0x000000}
 		 */
@@ -82,26 +91,42 @@ public interface ColorParser {
 		 * Bright White {@code 0xFFFFFF}
 		 */
 		BRIGHT_WHITE('W', 7, true);
-		private char name;
+		private char code;
 		private int num;
 		private boolean bright;
-		
-		private Color(char name, int num, boolean bright) {
-			this.name = name;
+		Color(char code, int num, boolean bright) {
+			this.code = code;
 			this.num = num;
 			this.bright = bright;
 		}
 		/**
+		 * Uses the character code to retrieve the color.
+		 *
+		 * @param code
+		 * 		The character code representing the color.
+		 *
+		 * @return The Color.
+		 */
+		@Nullable
+		public static Color findColor(char code) {
+			for(Color clr : Color.values()) {
+				if(clr.getCode() == code) {
+					return clr;
+				}
+			}
+			return null;
+		}
+		/**
 		 * Returns the character representing the color.
-		 * 
+		 *
 		 * @return The color code.
 		 */
-		public char getName() {
-			return name;
+		public char getCode() {
+			return code;
 		}
 		/**
 		 * Gets the ANSI number representing the color.
-		 * 
+		 *
 		 * @return The number.
 		 */
 		public int getNum() {
@@ -109,26 +134,11 @@ public interface ColorParser {
 		}
 		/**
 		 * Whether the color is a "bright" color.
-		 * 
+		 *
 		 * @return {@code true} if the color is "bright".
 		 */
 		public boolean isBright() {
 			return bright;
-		}
-		/**
-		 * Uses the character code to retrieve the color.
-		 * 
-		 * @param name
-		 *            The character code representing the color.
-		 * @return The Color.
-		 */
-		public static Color findColor(char name) {
-			for(Color clr : Color.values()) {
-				if(clr.getName() == name) {
-					return clr;
-				}
-			}
-			return null;
 		}
 	}
 }
