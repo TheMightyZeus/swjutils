@@ -1,5 +1,6 @@
 package com.seiferware.java.utils.i18n;
 
+import com.seiferware.java.utils.reflection.ClassReflection;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
@@ -17,26 +18,17 @@ public class ClassPlaceholderParser implements PlaceholderParser {
 	@Override
 	public String parseObject(@NotNull PlaceholderRequest request) throws PlaceholderException {
 		Class<?> origcls = request.getTarget().getClass();
-		Class<?> cls = origcls;
-		if(tempparsers.containsKey(cls)) {
-			return tempparsers.get(cls).parseObject(request);
+		if(tempparsers.containsKey(origcls)) {
+			return tempparsers.get(origcls).parseObject(request);
 		}
-		while(!parsers.containsKey(cls) && cls != null) {
-			cls = cls.getSuperclass();
-		}
-		if(cls == null) {
-			Class<?>[] ifaces = request.getTarget().getClass().getInterfaces();
-			for(Class<?> iface : ifaces) {
-				if(parsers.containsKey(iface)) {
-					cls = iface;
-					break;
-				}
+		Class<?> cls = null;
+		for(Class<?> cc : ClassReflection.getAllSuperClassesAndInterfaces(origcls, true)) {
+			if(parsers.containsKey(cc)) {
+				cls = cc;
 			}
 		}
 		if(cls != null) {
-			if(cls != origcls) {
-				tempparsers.put(origcls, parsers.get(cls));
-			}
+			tempparsers.put(origcls, parsers.get(cls));
 			return parsers.get(cls).parseObject(request);
 		}
 		return request.getTarget().toString();

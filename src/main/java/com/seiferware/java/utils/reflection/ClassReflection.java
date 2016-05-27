@@ -69,7 +69,8 @@ public final class ClassReflection {
 		return fields.toArray(new Field[fields.size()]);
 	}
 	/**
-	 * Retrieves all methods on a given class. Searches methods of all visibility levels, defined on {@code cls} and all
+	 * Retrieves all methods on a given class. Searches methods of all visibility levels, defined on {@code cls} and
+	 * all
 	 * superclasses and implemented interfaces, up to but not including {@code exclude}.
 	 *
 	 * @param cls
@@ -106,7 +107,8 @@ public final class ClassReflection {
 		return methods.values().toArray(new Method[methods.size()]);
 	}
 	/**
-	 * Retrieves all methods on a given class. Searches methods of all visibility levels, defined on {@code cls} and all
+	 * Retrieves all methods on a given class. Searches methods of all visibility levels, defined on {@code cls} and
+	 * all
 	 * superclasses and implemented interfaces, up to but not including {@code Object}.
 	 *
 	 * @param cls
@@ -119,7 +121,8 @@ public final class ClassReflection {
 		return getAllMethods(cls, Object.class);
 	}
 	/**
-	 * Retrieves all methods that have annotations of the given type. Searches methods of all visibility levels, defined
+	 * Retrieves all methods that have annotations of the given type. Searches methods of all visibility levels,
+	 * defined
 	 * on {@code cls} and all superclasses and implemented interfaces.
 	 *
 	 * @param cls
@@ -151,5 +154,30 @@ public final class ClassReflection {
 			}
 		}
 		return methods.values().toArray(new Method[methods.size()]);
+	}
+	/**
+	 * Finds all classes and interfaces which {@code cls} implements or extends, including deep ancestry and {@code
+	 * cls} itself. Essentially, finds any type for which {@link Class#isAssignableFrom(Class)} would return true with
+	 * {@code cls} as the parameter.
+	 *
+	 * @param cls
+	 * 		The class for which to retrieve the inheritance hierarchy
+	 * @param ignoreObject
+	 * 		Whether {@code Object.class} will be excluded from the list
+	 *
+	 * @return The class objects representing the members of the inheritance chain of {@code cls}, optionally excluding
+	 * {@code Object.class}
+	 */
+	@NotNull
+	public static Class<?>[] getAllSuperClassesAndInterfaces(@NotNull Class<?> cls, boolean ignoreObject) {
+		List<Class<?>> lst = new ArrayList<>();
+		lst.add(cls);
+		for(Class<?> cc : cls.getInterfaces()) {
+			Collections.addAll(lst, getAllSuperClassesAndInterfaces(cc, ignoreObject));
+		}
+		if(cls.getSuperclass() != null && (cls.getSuperclass() != Object.class || !ignoreObject)) {
+			Collections.addAll(lst, getAllSuperClassesAndInterfaces(cls.getSuperclass(), ignoreObject));
+		}
+		return lst.toArray(new Class<?>[lst.size()]);
 	}
 }
