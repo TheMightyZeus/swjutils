@@ -69,6 +69,16 @@ import java.util.concurrent.LinkedTransferQueue;
 public abstract class DataStoreReader {
 	private final Class<?>[] collectionClasses = {ArrayList.class, HashSet.class, LinkedList.class, LinkedBlockingQueue.class, LinkedBlockingDeque.class, LinkedTransferQueue.class};
 	/**
+	 * Creates an instance of {@link ReaderBookmark} that represents the current position in the data hierarchy. At any
+	 * time, {@link #returnToBookmark(ReaderBookmark)} may be called on this {@link DataStoreReader} to return to this
+	 * position.
+	 *
+	 * @return The {@link ReaderBookmark} instance
+	 * @see ReaderBookmark
+	 * @see #returnToBookmark(ReaderBookmark)
+	 */
+	public abstract @NotNull ReaderBookmark createBookmark();
+	/**
 	 * Reads the {@link Storable} fields of the object. The object <i>is</i> the active context. This method is called
 	 * by default from {@link #readObject()} if the object does not implement {@link CustomStoreType}. This method is
 	 * useful for objects which <i>do</i> implement {@link CustomStoreType} if some of the data can be read using the
@@ -259,6 +269,7 @@ public abstract class DataStoreReader {
 	 * @return The length of the array.
 	 */
 	public abstract int getArrayLength();
+	protected abstract void loadBookmark(@NotNull ReaderBookmark bookmark);
 	/**
 	 * Returns the boolean value associated with the provided name.
 	 *
@@ -621,6 +632,23 @@ public abstract class DataStoreReader {
 		}
 	}
 	/**
+	 * Returns to a specific point in the data hierarchy as represented by the {@code bookmark} parameter.
+	 *
+	 * @param bookmark
+	 * 		The {@link ReaderBookmark} instance to return to.
+	 *
+	 * @throws MismatchedBookmarkException
+	 * 		If the {@code bookmark} parameter was not created using this instance's {@link #createBookmark()} method.
+	 * @see ReaderBookmark
+	 * @see #createBookmark()
+	 */
+	public final void returnToBookmark(@NotNull ReaderBookmark bookmark) {
+		if(bookmark.getOwner() != this) {
+			throw new MismatchedBookmarkException("The bookmark provided to returnToBookmark() was not created from this DataStoreReader instance.");
+		}
+		loadBookmark(bookmark);
+	}
+	/**
 	 * Attempts to enter a named array context.
 	 *
 	 * @param name
@@ -677,6 +705,20 @@ public abstract class DataStoreReader {
 			return readChar("_value", (char) 0);
 		} else {
 			return null;
+		}
+	}
+	/**
+	 * This class represents a specific point in the data hierarchy for a specific {@link DataStoreReader} instance. It
+	 * is created using the {@link #createBookmark()} method, and used via the {@link
+	 * #returnToBookmark(ReaderBookmark)} method.
+	 */
+	public abstract static class ReaderBookmark {
+		private final DataStoreReader owner;
+		protected ReaderBookmark(@NotNull DataStoreReader owner) {
+			this.owner = owner;
+		}
+		protected @NotNull DataStoreReader getOwner() {
+			return owner;
 		}
 	}
 }

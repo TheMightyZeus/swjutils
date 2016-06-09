@@ -93,6 +93,10 @@ public class XmlDataStoreWriter extends DataStoreWriter {
 		active = item;
 	}
 	@Override
+	public @NotNull WriterBookmark createBookmark() {
+		return new Bookmark(this, active);
+	}
+	@Override
 	public void createComplex(@NotNull String name) {
 		checkArray(false);
 		active = getChild(name);
@@ -121,6 +125,10 @@ public class XmlDataStoreWriter extends DataStoreWriter {
 	protected boolean isArray() {
 		return isArray(active);
 	}
+	@Override
+	public void loadBookmark(@NotNull WriterBookmark bookmark) {
+		active = ((Bookmark) bookmark).place;
+	}
 	/**
 	 * Saves the data that has been stored so far to an XML file.
 	 *
@@ -131,7 +139,8 @@ public class XmlDataStoreWriter extends DataStoreWriter {
 	 * 		If the file exists but is a directory rather than a regular file, does not exist but cannot be created, or
 	 * 		cannot be opened for any other reason, or if an I/O error occurs.
 	 * @throws TransformerFactoryConfigurationError
-	 * 		Thrown in case of {@link ServiceConfigurationError service configuration error} or if the implementation is not
+	 * 		Thrown in case of {@link ServiceConfigurationError service configuration error} or if the implementation is
+	 * 		not
 	 * 		available or cannot be instantiated.
 	 * @throws TransformerException
 	 * 		When it is not possible to create a {@link Transformer} instance or an unrecoverable error occurs during the
@@ -150,7 +159,8 @@ public class XmlDataStoreWriter extends DataStoreWriter {
 	 * 		If the file exists but is a directory rather than a regular file, does not exist but cannot be created, or
 	 * 		cannot be opened for any other reason, or if an I/O error occurs.
 	 * @throws TransformerFactoryConfigurationError
-	 * 		Thrown in case of {@link ServiceConfigurationError service configuration error} or if the implementation is not
+	 * 		Thrown in case of {@link ServiceConfigurationError service configuration error} or if the implementation is
+	 * 		not
 	 * 		available or cannot be instantiated.
 	 * @throws TransformerException
 	 * 		When it is not possible to create a {@link Transformer} instance or an unrecoverable error occurs during the
@@ -170,7 +180,8 @@ public class XmlDataStoreWriter extends DataStoreWriter {
 	 * 		The stream to which the data will be written.
 	 *
 	 * @throws TransformerFactoryConfigurationError
-	 * 		Thrown in case of {@link ServiceConfigurationError service configuration error} or if the implementation is not
+	 * 		Thrown in case of {@link ServiceConfigurationError service configuration error} or if the implementation is
+	 * 		not
 	 * 		available or cannot be instantiated.
 	 * @throws TransformerException
 	 * 		When it is not possible to create a {@link Transformer} instance or an unrecoverable error occurs during the
@@ -246,6 +257,13 @@ public class XmlDataStoreWriter extends DataStoreWriter {
 			Element item = root.createElement("item");
 			item.setTextContent(s);
 			a.appendChild(item);
+		}
+	}
+	private class Bookmark extends WriterBookmark {
+		private final Element place;
+		public Bookmark(@NotNull DataStoreWriter owner, @NotNull Element place) {
+			super(owner);
+			this.place = place;
 		}
 	}
 }

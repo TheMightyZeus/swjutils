@@ -102,6 +102,10 @@ public class BinaryDataStoreReader extends DataStoreReader {
 		}
 	}
 	@Override
+	public @NotNull DataStoreReader.ReaderBookmark createBookmark() {
+		return new Bookmark(this, active);
+	}
+	@Override
 	public void enterArray(@NotNull String name) throws EntryNotFoundException, IncompatibleTypeException {
 		checkArray(false);
 		DataObject temp = get(name, DataObject.class);
@@ -153,8 +157,7 @@ public class BinaryDataStoreReader extends DataStoreReader {
 		} else if(!cls.isInstance(entry)) {
 			throw new IncompatibleTypeException();
 		}
-		@SuppressWarnings("unchecked") T result = (T) entry;
-		return result;
+		return cls.cast(entry);
 	}
 	@Override
 	public int getArrayLength() {
@@ -202,6 +205,10 @@ public class BinaryDataStoreReader extends DataStoreReader {
 	}
 	protected boolean isArrayElement() {
 		return active.parent != null && active.parent.isArray;
+	}
+	@Override
+	public void loadBookmark(@NotNull ReaderBookmark bookmark) {
+		active = ((Bookmark) bookmark).place;
 	}
 	@Override
 	public boolean readBoolean(@NotNull String name) throws EntryNotFoundException, IncompatibleTypeException {
@@ -256,6 +263,14 @@ public class BinaryDataStoreReader extends DataStoreReader {
 	public String[] readStringArray(@NotNull String name) throws EntryNotFoundException, IncompatibleTypeException {
 		return get(name, String[].class);
 	}
+	private class Bookmark extends ReaderBookmark {
+		private final DataObject place;
+		public Bookmark(@NotNull DataStoreReader owner, @NotNull DataObject place) {
+			super(owner);
+			this.place = place;
+		}
+	}
+	
 	private class DataObject {
 		DataObject parent;
 		boolean isArray;

@@ -108,6 +108,16 @@ public abstract class DataStoreWriter {
 	 */
 	public abstract void createArrayElement();
 	/**
+	 * Creates an instance of {@link WriterBookmark} that represents the current position in the data hierarchy. At any
+	 * time, {@link #returnToBookmark(WriterBookmark)} may be called on this {@link DataStoreWriter} to return to this
+	 * position.
+	 *
+	 * @return The {@link WriterBookmark} instance
+	 * @see WriterBookmark
+	 * @see #returnToBookmark(WriterBookmark)
+	 */
+	public abstract @NotNull WriterBookmark createBookmark();
+	/**
 	 * Creates and enters a new complex object context in the current complex object context.
 	 *
 	 * @param name
@@ -225,6 +235,24 @@ public abstract class DataStoreWriter {
 			return l.toArray(new String[l.size()]);
 		}
 		return new String[0];
+	}
+	protected abstract void loadBookmark(@NotNull WriterBookmark bookmark);
+	/**
+	 * Returns to a specific point in the data hierarchy as represented by the {@code bookmark} parameter.
+	 *
+	 * @param bookmark
+	 * 		The {@link WriterBookmark} instance to return to.
+	 *
+	 * @throws MismatchedBookmarkException
+	 * 		If the {@code bookmark} parameter was not created using this instance's {@link #createBookmark()} method.
+	 * @see WriterBookmark
+	 * @see #createBookmark()
+	 */
+	public final void returnToBookmark(@NotNull WriterBookmark bookmark) {
+		if(bookmark.getOwner() != this) {
+			throw new MismatchedBookmarkException("The bookmark provided to returnToBookmark() was not created from this DataStoreReader instance.");
+		}
+		loadBookmark(bookmark);
 	}
 	private boolean tryWritePrimitive(@NotNull Object dt) {
 		Class<?> cls = dt.getClass();
@@ -378,4 +406,18 @@ public abstract class DataStoreWriter {
 	 * 		The value associated with the name.
 	 */
 	public abstract void writeStringArray(@NotNull String name, @NotNull String[] value);
+	/**
+	 * This class represents a specific point in the data hierarchy for a specific {@link DataStoreWriter} instance. It
+	 * is created using the {@link #createBookmark()} method, and used via the {@link
+	 * #returnToBookmark(WriterBookmark)} method.
+	 */
+	public abstract static class WriterBookmark {
+		private final DataStoreWriter owner;
+		protected WriterBookmark(@NotNull DataStoreWriter owner) {
+			this.owner = owner;
+		}
+		protected @NotNull DataStoreWriter getOwner() {
+			return owner;
+		}
+	}
 }

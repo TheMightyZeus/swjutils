@@ -84,6 +84,10 @@ public class BinaryDataStoreWriter extends DataStoreWriter {
 		dataStack.addFirst(false);
 	}
 	@Override
+	public @NotNull DataStoreWriter.WriterBookmark createBookmark() {
+		throw new UnsupportedOperationException();
+	}
+	@Override
 	public void createComplex(@NotNull String name) {
 		checkArray(false);
 		writeRawData(TYPE_OBJECT);
@@ -95,6 +99,10 @@ public class BinaryDataStoreWriter extends DataStoreWriter {
 	}
 	protected boolean isArrayElement() {
 		return dataStack.get(1);
+	}
+	@Override
+	protected void loadBookmark(@NotNull WriterBookmark bookmark) {
+		throw new UnsupportedOperationException();
 	}
 	@Override
 	public void writeBoolean(@NotNull String name, boolean value) {

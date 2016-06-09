@@ -90,6 +90,10 @@ public class XmlDataStoreReader extends DataStoreReader {
 		}
 	}
 	@Override
+	public @NotNull DataStoreReader.ReaderBookmark createBookmark() {
+		return new Bookmark(this, active);
+	}
+	@Override
 	public void enterArray(@NotNull String name) throws EntryNotFoundException, IncompatibleTypeException {
 		Element ch = readChild(name);
 		if(ch == null) {
@@ -163,6 +167,10 @@ public class XmlDataStoreReader extends DataStoreReader {
 	}
 	protected boolean isArray() {
 		return isArray(active);
+	}
+	@Override
+	public void loadBookmark(@NotNull ReaderBookmark bookmark) {
+		active = ((Bookmark) bookmark).place;
 	}
 	@NotNull
 	protected String readAttribute(@NotNull String name) throws EntryNotFoundException, IncompatibleTypeException {
@@ -306,5 +314,12 @@ public class XmlDataStoreReader extends DataStoreReader {
 			}
 		}
 		return items.toArray(new String[items.size()]);
+	}
+	private class Bookmark extends ReaderBookmark {
+		private final Element place;
+		public Bookmark(@NotNull DataStoreReader owner, @NotNull Element place) {
+			super(owner);
+			this.place = place;
+		}
 	}
 }
