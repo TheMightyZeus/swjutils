@@ -96,6 +96,9 @@ public class BinaryDataStoreWriter extends DataStoreWriter {
 	}
 	@Override
 	protected boolean isPathLocked(@NotNull WriterBookmark to) {
+		if(lockMap.isEmpty()) {
+			return false;
+		}
 		DataObject toEl = ((Bookmark) to).place;
 		if(toEl == active) {
 			return false;

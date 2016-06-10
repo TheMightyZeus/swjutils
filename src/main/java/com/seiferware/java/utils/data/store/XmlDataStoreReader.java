@@ -180,26 +180,29 @@ public class XmlDataStoreReader extends DataStoreReader {
 	}
 	@Override
 	protected boolean isPathLocked(@NotNull ReaderBookmark to) {
+		if(lockMap.isEmpty()) {
+			return false;
+		}
 		Element toEl = ((Bookmark) to).place;
 		if(toEl == active) {
 			return false;
 		}
-		List<Element> toPath = new ArrayList<>();
+		List<Node> toPath = new ArrayList<>();
 		toPath.add(((Bookmark) to).place);
-		while(toPath.get(0).getParentNode() instanceof Element) {
-			Element tempTo = (Element) toPath.get(0).getParentNode();
+		while(toPath.get(0).getParentNode() != null) {
+			Node tempTo = toPath.get(0).getParentNode();
 			if(tempTo == active) {
 				// If the current element is an ancestor of the target element, there can be no relevant locks.
 				return false;
 			}
 			toPath.add(0, tempTo);
 		}
-		List<Element> fromPath = new ArrayList<>();
+		List<Node> fromPath = new ArrayList<>();
 		fromPath.add(active);
-		while(fromPath.get(0).getParentNode() instanceof Element) {
-			fromPath.add(0, (Element) fromPath.get(0).getParentNode());
+		while(fromPath.get(0).getParentNode() != null) {
+			fromPath.add(0, fromPath.get(0).getParentNode());
 		}
-		Element commonAncestor = null;
+		Node commonAncestor = null;
 		int max = Math.min(fromPath.size(), toPath.size());
 		for(int i = 1; i < max; i++) {
 			if(toPath.get(i) != fromPath.get(i)) {
@@ -209,6 +212,8 @@ public class XmlDataStoreReader extends DataStoreReader {
 		}
 		if(commonAncestor == null && fromPath.get(max) == toEl) {
 			commonAncestor = toEl;
+		} else if (commonAncestor == null) {
+			return false;
 		}
 		Element tempFrom = active;
 		while(tempFrom != commonAncestor) {

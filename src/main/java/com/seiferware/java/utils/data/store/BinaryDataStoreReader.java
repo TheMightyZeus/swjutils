@@ -220,6 +220,9 @@ public class BinaryDataStoreReader extends DataStoreReader {
 	}
 	@Override
 	protected boolean isPathLocked(@NotNull ReaderBookmark to) {
+		if(lockMap.isEmpty()) {
+			return false;
+		}
 		DataObject toEl = ((Bookmark) to).place;
 		if(toEl == active) {
 			return false;
