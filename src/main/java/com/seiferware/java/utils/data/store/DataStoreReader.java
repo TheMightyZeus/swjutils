@@ -69,6 +69,43 @@ import java.util.concurrent.LinkedTransferQueue;
 public abstract class DataStoreReader {
 	private final Class<?>[] collectionClasses = {ArrayList.class, HashSet.class, LinkedList.class, LinkedBlockingQueue.class, LinkedBlockingDeque.class, LinkedTransferQueue.class};
 	/**
+	 * This method creates a lock on the instance which prevents traversal up the data hierarchy above the current
+	 * position. The hierarchy may be traversed downward as desired. Removing the lock via {@link
+	 * #clearLock(ReaderLock, boolean)} also removes the restriction.
+	 *
+	 * @return A newly created lock.
+	 * @see ReaderLock
+	 * @see #clearLock(ReaderLock, boolean)
+	 */
+	public final @NotNull ReaderLock acquireLock() {
+		ReaderLock rl = new ReaderLock(createBookmark());
+		registerLock(rl.getId());
+		return rl;
+	}
+	/**
+	 * Removes a lock from the data hierarchy. If another lock is in place at a deeper point in the hierarchy, this
+	 * method will fail and throw a {@link DataLockException}.
+	 *
+	 * @param lock
+	 * 		The lock to be removed.
+	 * @param returnToBookmark
+	 * 		Whether to return to the point where the lock was created.
+	 *
+	 * @throws DataLockException
+	 * 		If a lock exists at a deeper point in the data hierarchy.
+	 * @see ReaderLock
+	 * @see #acquireLock()
+	 */
+	public final void clearLock(@NotNull ReaderLock lock, boolean returnToBookmark) {
+		if(isPathLocked(lock.getBookmark())) {
+			throw new DataLockException();
+		}
+		removeLock(lock.getId());
+		if(returnToBookmark) {
+			returnToBookmark(lock.getBookmark());
+		}
+	}
+	/**
 	 * Creates an instance of {@link ReaderBookmark} that represents the current position in the data hierarchy. At any
 	 * time, {@link #returnToBookmark(ReaderBookmark)} may be called on this {@link DataStoreReader} to return to this
 	 * position.
@@ -253,14 +290,29 @@ public abstract class DataStoreReader {
 	public abstract void enterComplex(@NotNull String name) throws EntryNotFoundException, IncompatibleTypeException;
 	/**
 	 * Returns from an array context to the parent complex object context.
+	 *
+	 * @throws DataLockException
+	 * 		If the current context is locked with a {@link ReaderLock}.
+	 * @throws IllegalStateException
+	 * 		If the current context is not an array.
 	 */
 	public abstract void exitArray();
 	/**
 	 * Returns from an array element context to the containing array context.
+	 *
+	 * @throws DataLockException
+	 * 		If the current context is locked with a {@link ReaderLock}.
+	 * @throws IllegalStateException
+	 * 		If the current context is not an array element.
 	 */
 	public abstract void exitArrayElement();
 	/**
 	 * Returns from a complex object context to the parent complex object context.
+	 *
+	 * @throws DataLockException
+	 * 		If the current context is locked with a {@link ReaderLock}.
+	 * @throws IllegalStateException
+	 * 		If the current context is not a complex object.
 	 */
 	public abstract void exitComplex();
 	/**
@@ -269,6 +321,7 @@ public abstract class DataStoreReader {
 	 * @return The length of the array.
 	 */
 	public abstract int getArrayLength();
+	protected abstract boolean isPathLocked(@NotNull ReaderBookmark to);
 	protected abstract void loadBookmark(@NotNull ReaderBookmark bookmark);
 	/**
 	 * Returns the boolean value associated with the provided name.
@@ -631,6 +684,8 @@ public abstract class DataStoreReader {
 			return defaultvalue;
 		}
 	}
+	protected abstract void registerLock(@NotNull String id);
+	protected abstract void removeLock(@NotNull String id);
 	/**
 	 * Returns to a specific point in the data hierarchy as represented by the {@code bookmark} parameter.
 	 *
@@ -639,12 +694,17 @@ public abstract class DataStoreReader {
 	 *
 	 * @throws MismatchedBookmarkException
 	 * 		If the {@code bookmark} parameter was not created using this instance's {@link #createBookmark()} method.
+	 * @throws DataLockException
+	 * 		If a {@link ReaderLock} exists which prevents the traversal.
 	 * @see ReaderBookmark
 	 * @see #createBookmark()
 	 */
 	public final void returnToBookmark(@NotNull ReaderBookmark bookmark) {
 		if(bookmark.getOwner() != this) {
 			throw new MismatchedBookmarkException("The bookmark provided to returnToBookmark() was not created from this DataStoreReader instance.");
+		}
+		if(isPathLocked(bookmark)) {
+			throw new DataLockException();
 		}
 		loadBookmark(bookmark);
 	}
@@ -719,6 +779,27 @@ public abstract class DataStoreReader {
 		}
 		protected @NotNull DataStoreReader getOwner() {
 			return owner;
+		}
+	}
+	
+	/**
+	 * This class represents a lock placed on a {@link DataStoreReader} instance, which prevents traversing further up
+	 * the hierarchy than the location where the lock was placed.
+	 *
+	 * @see #acquireLock()
+	 * @see #clearLock(ReaderLock, boolean)
+	 */
+	public static final class ReaderLock {
+		private final String id = UUID.randomUUID().toString();
+		private final ReaderBookmark bookmark;
+		private ReaderLock(@NotNull ReaderBookmark bookmark) {
+			this.bookmark = bookmark;
+		}
+		private @NotNull ReaderBookmark getBookmark() {
+			return bookmark;
+		}
+		private @NotNull String getId() {
+			return id;
 		}
 	}
 }

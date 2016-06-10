@@ -5,8 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.EnumSet;
-import java.util.LinkedList;
+import java.util.*;
 
 /**
  * An implementation of {@link DataStoreWriter} that stores data in a very compact, byte-oriented format.
@@ -29,18 +28,10 @@ public class BinaryDataStoreWriter extends DataStoreWriter {
 	static final byte TYPE_END = 'z';
 	static final byte TYPE_CHAR = 'c';
 	static final byte TYPE_STRING_ARRAY = 'S';
-	protected final OutputStream out;
-	private final LinkedList<Boolean> dataStack = new LinkedList<>();
-	/**
-	 * Creates a new instance which will write data to {@code out}.
-	 *
-	 * @param out
-	 * 		The stream to which the data will be written.
-	 */
-	public BinaryDataStoreWriter(@NotNull OutputStream out) {
-		this.out = out;
-		dataStack.addFirst(false);
-	}
+	protected final Map<String, DataObject> lockMap = new HashMap<>();
+	private final DataObject root = new DataObject();
+	private OutputStream out;
+	private DataObject active;
 	protected void checkArray(boolean shouldBeArray) {
 		if(shouldBeArray != isArray()) {
 			throw new IllegalStateException("Operation is " + (isArray() ? "not" : "only") + " valid while operating on an array.");
@@ -51,118 +42,174 @@ public class BinaryDataStoreWriter extends DataStoreWriter {
 			throw new IllegalStateException("Operation is " + (isArray() ? "not" : "only") + " valid while operating on an array element.");
 		}
 	}
+	protected void checkLock() {
+		if(checkLock(active)) {
+			throw new DataLockException();
+		}
+	}
+	protected boolean checkLock(@NotNull DataObject el) {
+		return lockMap.containsValue(el);
+	}
 	@Override
 	public void closeArray() {
 		checkArray(true);
-		writeRawData(TYPE_END);
-		dataStack.removeFirst();
+		checkLock();
+		active = active.parent;
 	}
 	@Override
 	public void closeArrayElement() {
 		checkArrayElement(true);
-		writeRawData(TYPE_END);
-		dataStack.removeFirst();
+		checkLock();
+		active = active.parent;
 	}
 	@Override
 	public void closeComplex() {
 		checkArray(false);
 		checkArrayElement(false);
-		writeRawData(TYPE_END);
-		dataStack.removeFirst();
+		checkLock();
+		active = active.parent;
 	}
 	@Override
 	public void createArray(@NotNull String name) {
 		checkArray(false);
-		writeRawData(TYPE_ARRAY);
-		writeString(name);
-		dataStack.addFirst(true);
+		active = active.newChild(name, true);
 	}
 	@Override
 	public void createArrayElement() {
 		checkArray(true);
-		writeRawData(TYPE_OBJECT);
-		dataStack.addFirst(false);
+		active = active.newChild(String.valueOf(active.items.size()), false);
 	}
 	@Override
 	public @NotNull DataStoreWriter.WriterBookmark createBookmark() {
-		throw new UnsupportedOperationException();
+		return new Bookmark(this, active);
 	}
 	@Override
 	public void createComplex(@NotNull String name) {
 		checkArray(false);
-		writeRawData(TYPE_OBJECT);
-		writeString(name);
-		dataStack.addFirst(false);
+		active = active.newChild(name, false);
 	}
 	protected boolean isArray() {
-		return dataStack.peekFirst();
+		return active.isArray;
 	}
 	protected boolean isArrayElement() {
-		return dataStack.get(1);
+		return active.parent != null && active.parent.isArray;
+	}
+	@Override
+	protected boolean isPathLocked(@NotNull WriterBookmark to) {
+		DataObject toEl = ((Bookmark) to).place;
+		if(toEl == active) {
+			return false;
+		}
+		List<DataObject> toPath = new ArrayList<>();
+		toPath.add(((Bookmark) to).place);
+		while(toPath.get(0).parent != null) {
+			DataObject tempTo = toPath.get(0).parent;
+			if(tempTo == active) {
+				// If the current element is an ancestor of the target element, there can be no relevant locks.
+				return false;
+			}
+			toPath.add(0, tempTo);
+		}
+		List<DataObject> fromPath = new ArrayList<>();
+		fromPath.add(active);
+		while(fromPath.get(0).parent != null) {
+			fromPath.add(0, fromPath.get(0).parent);
+		}
+		DataObject commonAncestor = null;
+		int max = Math.min(fromPath.size(), toPath.size());
+		for(int i = 1; i < max; i++) {
+			if(toPath.get(i) != fromPath.get(i)) {
+				commonAncestor = fromPath.get(i - 1);
+				break;
+			}
+		}
+		if(commonAncestor == null && fromPath.get(max) == toEl) {
+			commonAncestor = toEl;
+		}
+		DataObject tempFrom = active;
+		while(tempFrom != commonAncestor) {
+			if(checkLock(tempFrom)) {
+				return true;
+			}
+			tempFrom = tempFrom.parent;
+		}
+		return false;
 	}
 	@Override
 	protected void loadBookmark(@NotNull WriterBookmark bookmark) {
-		throw new UnsupportedOperationException();
+		active = ((Bookmark) bookmark).place;
+	}
+	@Override
+	protected void registerLock(@NotNull String id) {
+		lockMap.put(id, active);
+	}
+	@Override
+	protected void removeLock(@NotNull String id) {
+		lockMap.remove(id);
+	}
+	/**
+	 * Saves the data to an output stream.
+	 *
+	 * @param out
+	 * 		The stream to which the data will be written.
+	 */
+	public void save(@NotNull OutputStream out) {
+		this.out = out;
+		writeRawObject(root);
 	}
 	@Override
 	public void writeBoolean(@NotNull String name, boolean value) {
 		checkArray(false);
-		writeRawData(value ? TYPE_BOOLEAN_TRUE : TYPE_BOOLEAN_FALSE);
-		writeString(name);
+		active.items.put(name, value);
 	}
 	@Override
 	public void writeByte(@NotNull String name, byte value) {
 		checkArray(false);
-		writeRawData(TYPE_BYTE);
-		writeString(name);
-		writeRawData(value);
+		active.items.put(name, value);
 	}
 	@Override
 	public void writeChar(@NotNull String name, char value) {
 		checkArray(false);
-		writeRawData(TYPE_CHAR);
-		writeString(name);
-		writeString(String.valueOf(value));
+		active.items.put(name, value);
 	}
 	@Override
 	public void writeDouble(@NotNull String name, double value) {
 		checkArray(false);
-		writeRawData(TYPE_DOUBLE);
-		writeString(name);
-		writeRawData(value);
+		active.items.put(name, value);
 	}
 	@Override
 	public <E extends Enum<E>> void writeEnum(@NotNull String name, @NotNull EnumSet<E> value, @NotNull Class<E> type) {
 		checkArray(false);
-		StringBuilder result = new StringBuilder();
-		for(E item : value) {
-			result.append(item.toString());
-			result.append(' ');
-		}
-		writeRawData(TYPE_ENUM);
-		writeString(name);
-		writeString(result.toString().trim());
+		active.items.put(name, value);
 	}
 	@Override
 	public void writeFloat(@NotNull String name, float value) {
 		checkArray(false);
-		writeRawData(TYPE_FLOAT);
-		writeString(name);
-		writeRawData(value);
+		active.items.put(name, value);
 	}
 	@Override
 	public void writeInt(@NotNull String name, int value) {
 		checkArray(false);
-		writeRawData(TYPE_INT);
-		writeString(name);
-		writeRawData(value);
+		active.items.put(name, value);
 	}
 	@Override
 	public void writeLong(@NotNull String name, long value) {
 		checkArray(false);
-		writeRawData(TYPE_LONG);
+		active.items.put(name, value);
+	}
+	private void writeRawBoolean(@NotNull String name, boolean value) {
+		writeRawData(value ? TYPE_BOOLEAN_TRUE : TYPE_BOOLEAN_FALSE);
+		writeString(name);
+	}
+	private void writeRawByte(@NotNull String name, byte value) {
+		writeRawData(TYPE_BYTE);
 		writeString(name);
 		writeRawData(value);
+	}
+	private void writeRawChar(@NotNull String name, char value) {
+		writeRawData(TYPE_CHAR);
+		writeString(name);
+		writeString(String.valueOf(value));
 	}
 	private void writeRawData(short n) {
 		try {
@@ -206,26 +253,116 @@ public class BinaryDataStoreWriter extends DataStoreWriter {
 		} catch (IOException ignored) {
 		}
 	}
+	private void writeRawDouble(@NotNull String name, double value) {
+		writeRawData(TYPE_DOUBLE);
+		writeString(name);
+		writeRawData(value);
+	}
+	private <E extends Enum<E>> void writeRawEnum(@NotNull String name, @NotNull EnumSet<E> value) {
+		StringBuilder result = new StringBuilder();
+		for(E item : value) {
+			result.append(item.toString());
+			result.append(' ');
+		}
+		writeRawData(TYPE_ENUM);
+		writeString(name);
+		writeString(result.toString().trim());
+	}
+	private void writeRawFloat(@NotNull String name, float value) {
+		writeRawData(TYPE_FLOAT);
+		writeString(name);
+		writeRawData(value);
+	}
+	private void writeRawInt(@NotNull String name, int value) {
+		writeRawData(TYPE_INT);
+		writeString(name);
+		writeRawData(value);
+	}
+	private void writeRawLong(@NotNull String name, long value) {
+		writeRawData(TYPE_LONG);
+		writeString(name);
+		writeRawData(value);
+	}
+	private void writeRawObject(@NotNull DataObject value) {
+		for(String key : value.items.keySet()) {
+			Object o = value.items.get(key);
+			if(o instanceof DataObject) {
+				writeRawObject(key, (DataObject) o);
+			} else if(o instanceof Integer) {
+				writeRawInt(key, (Integer) o);
+			} else if(o instanceof Long) {
+				writeRawLong(key, (Long) o);
+			} else if(o instanceof Float) {
+				writeRawFloat(key, (Float) o);
+			} else if(o instanceof Double) {
+				writeRawDouble(key, (Double) o);
+			} else if(o instanceof Boolean) {
+				writeRawBoolean(key, (Boolean) o);
+			} else if(o instanceof String) {
+				writeRawString(key, (String) o);
+			} else if(o instanceof String[]) {
+				writeRawStringArray(key, (String[]) o);
+			} else if(o instanceof Character) {
+				writeRawChar(key, (Character) o);
+			} else if(o instanceof Byte) {
+				writeRawByte(key, (Byte) o);
+			} else if(o instanceof EnumSet) {
+				writeRawEnum(key, (EnumSet<?>) o);
+			}
+		}
+	}
+	private void writeRawObject(@NotNull String name, @NotNull DataObject value) {
+		writeRawData(value.isArray ? TYPE_ARRAY : TYPE_OBJECT);
+		writeString(name);
+		writeRawObject(value);
+		writeRawData(TYPE_END);
+	}
+	private void writeRawString(@NotNull String name, @NotNull String value) {
+		writeRawData(TYPE_STRING);
+		writeString(name);
+		writeString(value);
+	}
+	private void writeRawStringArray(@NotNull String name, @NotNull String[] value) {
+		writeRawData(TYPE_STRING_ARRAY);
+		writeString(name);
+		writeRawData(value.length);
+		for(String s : value) {
+			writeString(s);
+		}
+	}
+	@Override
+	public void writeString(@NotNull String name, @NotNull String value) {
+		checkArray(false);
+		active.items.put(name, value);
+	}
 	private void writeString(@NotNull String string) {
 		byte[] s = string.getBytes();
 		writeRawData((short) s.length);
 		writeRawData(s);
 	}
 	@Override
-	public void writeString(@NotNull String name, @NotNull String value) {
-		checkArray(false);
-		writeRawData(TYPE_STRING);
-		writeString(name);
-		writeString(value);
-	}
-	@Override
 	public void writeStringArray(@NotNull String name, @NotNull String[] value) {
 		checkArray(false);
-		writeRawData(TYPE_STRING_ARRAY);
-		writeString(name);
-		writeRawData(value.length);
-		for(String s : value) {
-			writeString(s);
+		active.items.put(name, value);
+	}
+	private class Bookmark extends WriterBookmark {
+		private final DataObject place;
+		public Bookmark(@NotNull DataStoreWriter owner, @NotNull DataObject place) {
+			super(owner);
+			this.place = place;
+		}
+	}
+	
+	private class DataObject {
+		DataObject parent;
+		boolean isArray;
+		Map<String, Object> items = new HashMap<>();
+		@NotNull DataObject newChild(@NotNull String name, boolean isArray) {
+			DataObject res = new DataObject();
+			res.parent = this;
+			res.isArray = isArray;
+			items.put(name, res);
+			return res;
 		}
 	}
 }

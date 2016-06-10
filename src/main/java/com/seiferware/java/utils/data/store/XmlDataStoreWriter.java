@@ -15,9 +15,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.EnumSet;
-import java.util.Objects;
-import java.util.ServiceConfigurationError;
+import java.util.*;
 
 /**
  * An implementation of {@link DataStoreWriter} that stores data in XML format.
@@ -27,6 +25,7 @@ import java.util.ServiceConfigurationError;
  */
 public class XmlDataStoreWriter extends DataStoreWriter {
 	protected final Document root;
+	protected final Map<String, Element> lockMap = new HashMap<>();
 	protected @NotNull Element active;
 	/**
 	 * Creates an XML document with the provided root node name.
@@ -62,20 +61,31 @@ public class XmlDataStoreWriter extends DataStoreWriter {
 			throw new IllegalStateException("Operation is " + (isArray() ? "not" : "only") + " valid while operating on an array element.");
 		}
 	}
+	protected void checkLock() {
+		if(checkLock(active)) {
+			throw new DataLockException();
+		}
+	}
+	protected boolean checkLock(@NotNull Element el) {
+		return lockMap.containsValue(el);
+	}
 	@Override
 	public void closeArray() {
 		checkArray(true);
+		checkLock();
 		active = (Element) active.getParentNode();
 	}
 	@Override
 	public void closeArrayElement() {
 		checkArrayElement(true);
+		checkLock();
 		active = (Element) active.getParentNode();
 	}
 	@Override
 	public void closeComplex() {
 		checkArray(false);
 		checkArrayElement(false);
+		checkLock();
 		active = (Element) active.getParentNode();
 	}
 	@Override
@@ -126,8 +136,57 @@ public class XmlDataStoreWriter extends DataStoreWriter {
 		return isArray(active);
 	}
 	@Override
+	protected boolean isPathLocked(@NotNull WriterBookmark to) {
+		Element toEl = ((Bookmark) to).place;
+		if(toEl == active) {
+			return false;
+		}
+		List<Element> toPath = new ArrayList<>();
+		toPath.add(((Bookmark) to).place);
+		while(toPath.get(0).getParentNode() instanceof Element) {
+			Element tempTo = (Element) toPath.get(0).getParentNode();
+			if(tempTo == active) {
+				// If the current element is an ancestor of the target element, there can be no relevant locks.
+				return false;
+			}
+			toPath.add(0, tempTo);
+		}
+		List<Element> fromPath = new ArrayList<>();
+		fromPath.add(active);
+		while(fromPath.get(0).getParentNode() instanceof Element) {
+			fromPath.add(0, (Element) fromPath.get(0).getParentNode());
+		}
+		Element commonAncestor = null;
+		int max = Math.min(fromPath.size(), toPath.size());
+		for(int i = 1; i < max; i++) {
+			if(toPath.get(i) != fromPath.get(i)) {
+				commonAncestor = fromPath.get(i - 1);
+				break;
+			}
+		}
+		if(commonAncestor == null && fromPath.get(max) == toEl) {
+			commonAncestor = toEl;
+		}
+		Element tempFrom = active;
+		while(tempFrom != commonAncestor) {
+			if(checkLock(tempFrom)) {
+				return true;
+			}
+			tempFrom = (Element) tempFrom.getParentNode();
+		}
+		return false;
+	}
+	@Override
 	public void loadBookmark(@NotNull WriterBookmark bookmark) {
 		active = ((Bookmark) bookmark).place;
+	}
+	@Override
+	protected void registerLock(@NotNull String id) {
+		lockMap.put(id, active);
+	}
+	@Override
+	protected void removeLock(@NotNull String id) {
+		lockMap.remove(id);
 	}
 	/**
 	 * Saves the data that has been stored so far to an XML file.

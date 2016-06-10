@@ -16,6 +16,7 @@ import java.util.*;
 public class BinaryDataStoreReader extends DataStoreReader {
 	protected final InputStream in;
 	protected final DataObject root;
+	protected final Map<String, DataObject> lockMap = new HashMap<>();
 	protected DataObject active;
 	/**
 	 * Creates a new BinaryDataStoreReader that reads from {@code in}. The entire data tree is deserialized and stored
@@ -101,6 +102,14 @@ public class BinaryDataStoreReader extends DataStoreReader {
 			throw new IllegalStateException("Operation is " + (isArray() ? "not" : "only") + " valid while operating on an array element.");
 		}
 	}
+	protected void checkLock() {
+		if(checkLock(active)) {
+			throw new DataLockException();
+		}
+	}
+	protected boolean checkLock(@NotNull DataObject el) {
+		return lockMap.containsValue(el);
+	}
 	@Override
 	public @NotNull DataStoreReader.ReaderBookmark createBookmark() {
 		return new Bookmark(this, active);
@@ -136,17 +145,20 @@ public class BinaryDataStoreReader extends DataStoreReader {
 	@Override
 	public void exitArray() {
 		checkArray(true);
+		checkLock();
 		active = active.parent;
 	}
 	@Override
 	public void exitArrayElement() {
 		checkArrayElement(true);
+		checkLock();
 		active = active.parent;
 	}
 	@Override
 	public void exitComplex() {
 		checkArray(false);
 		checkArrayElement(false);
+		checkLock();
 		active = active.parent;
 	}
 	@NotNull
@@ -207,6 +219,47 @@ public class BinaryDataStoreReader extends DataStoreReader {
 		return active.parent != null && active.parent.isArray;
 	}
 	@Override
+	protected boolean isPathLocked(@NotNull ReaderBookmark to) {
+		DataObject toEl = ((Bookmark) to).place;
+		if(toEl == active) {
+			return false;
+		}
+		List<DataObject> toPath = new ArrayList<>();
+		toPath.add(((Bookmark) to).place);
+		while(toPath.get(0).parent != null) {
+			DataObject tempTo = toPath.get(0).parent;
+			if(tempTo == active) {
+				// If the current element is an ancestor of the target element, there can be no relevant locks.
+				return false;
+			}
+			toPath.add(0, tempTo);
+		}
+		List<DataObject> fromPath = new ArrayList<>();
+		fromPath.add(active);
+		while(fromPath.get(0).parent != null) {
+			fromPath.add(0, fromPath.get(0).parent);
+		}
+		DataObject commonAncestor = null;
+		int max = Math.min(fromPath.size(), toPath.size());
+		for(int i = 1; i < max; i++) {
+			if(toPath.get(i) != fromPath.get(i)) {
+				commonAncestor = fromPath.get(i - 1);
+				break;
+			}
+		}
+		if(commonAncestor == null && fromPath.get(max) == toEl) {
+			commonAncestor = toEl;
+		}
+		DataObject tempFrom = active;
+		while(tempFrom != commonAncestor) {
+			if(checkLock(tempFrom)) {
+				return true;
+			}
+			tempFrom = tempFrom.parent;
+		}
+		return false;
+	}
+	@Override
 	public void loadBookmark(@NotNull ReaderBookmark bookmark) {
 		active = ((Bookmark) bookmark).place;
 	}
@@ -262,6 +315,14 @@ public class BinaryDataStoreReader extends DataStoreReader {
 	@Override
 	public String[] readStringArray(@NotNull String name) throws EntryNotFoundException, IncompatibleTypeException {
 		return get(name, String[].class);
+	}
+	@Override
+	protected void registerLock(@NotNull String id) {
+		lockMap.put(id, active);
+	}
+	@Override
+	protected void removeLock(@NotNull String id) {
+		lockMap.remove(id);
 	}
 	private class Bookmark extends ReaderBookmark {
 		private final DataObject place;

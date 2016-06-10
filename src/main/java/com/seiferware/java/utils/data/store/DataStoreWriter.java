@@ -7,10 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -69,6 +66,43 @@ import java.util.stream.Collectors;
  * @see BinaryDataStoreWriter
  */
 public abstract class DataStoreWriter {
+	/**
+	 * This method creates a lock on the instance which prevents traversal up the data hierarchy above the current
+	 * position. The hierarchy may be traversed downward as desired. Removing the lock via {@link
+	 * #clearLock(WriterLock, boolean)} also removes the restriction.
+	 *
+	 * @return A newly created lock.
+	 * @see WriterLock
+	 * @see #clearLock(WriterLock, boolean)
+	 */
+	public final @NotNull WriterLock acquireLock() {
+		WriterLock rl = new WriterLock(createBookmark());
+		registerLock(rl.getId());
+		return rl;
+	}
+	/**
+	 * Removes a lock from the data hierarchy. If another lock is in place at a deeper point in the hierarchy, this
+	 * method will fail and throw a {@link DataLockException}.
+	 *
+	 * @param lock
+	 * 		The lock to be removed.
+	 * @param returnToBookmark
+	 * 		Whether to return to the point where the lock was created.
+	 *
+	 * @throws DataLockException
+	 * 		If a lock exists at a deeper point in the data hierarchy.
+	 * @see WriterLock
+	 * @see #acquireLock()
+	 */
+	public final void clearLock(@NotNull WriterLock lock, boolean returnToBookmark) {
+		if(isPathLocked(lock.getBookmark())) {
+			throw new DataLockException();
+		}
+		removeLock(lock.getId());
+		if(returnToBookmark) {
+			returnToBookmark(lock.getBookmark());
+		}
+	}
 	/**
 	 * Returns from an array context to the parent complex object context.
 	 */
@@ -236,7 +270,10 @@ public abstract class DataStoreWriter {
 		}
 		return new String[0];
 	}
+	protected abstract boolean isPathLocked(@NotNull WriterBookmark to);
 	protected abstract void loadBookmark(@NotNull WriterBookmark bookmark);
+	protected abstract void registerLock(@NotNull String id);
+	protected abstract void removeLock(@NotNull String id);
 	/**
 	 * Returns to a specific point in the data hierarchy as represented by the {@code bookmark} parameter.
 	 *
@@ -418,6 +455,27 @@ public abstract class DataStoreWriter {
 		}
 		protected @NotNull DataStoreWriter getOwner() {
 			return owner;
+		}
+	}
+	
+	/**
+	 * This class represents a lock placed on a {@link DataStoreWriter} instance, which prevents traversing further up
+	 * the hierarchy than the location where the lock was placed.
+	 *
+	 * @see #acquireLock()
+	 * @see #clearLock(WriterLock, boolean)
+	 */
+	public static final class WriterLock {
+		private final String id = UUID.randomUUID().toString();
+		private final WriterBookmark bookmark;
+		private WriterLock(@NotNull WriterBookmark bookmark) {
+			this.bookmark = bookmark;
+		}
+		private @NotNull WriterBookmark getBookmark() {
+			return bookmark;
+		}
+		private @NotNull String getId() {
+			return id;
 		}
 	}
 }

@@ -13,9 +13,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 
 /**
  * An implementation of {@link DataStoreReader} that reads data from an XML document.
@@ -25,6 +23,7 @@ import java.util.List;
  */
 public class XmlDataStoreReader extends DataStoreReader {
 	protected final Document root;
+	protected final Map<String, Element> lockMap = new HashMap<>();
 	protected Element active;
 	/**
 	 * Creates a new instance which reads the XML structure from a file. The document is parsed and stored internally
@@ -89,6 +88,14 @@ public class XmlDataStoreReader extends DataStoreReader {
 			throw new IllegalStateException("Operation is " + (isArray() ? "not" : "only") + " valid while operating on an array element.");
 		}
 	}
+	protected void checkLock() {
+		if(checkLock(active)) {
+			throw new DataLockException();
+		}
+	}
+	protected boolean checkLock(@NotNull Element el) {
+		return lockMap.containsValue(el);
+	}
 	@Override
 	public @NotNull DataStoreReader.ReaderBookmark createBookmark() {
 		return new Bookmark(this, active);
@@ -132,17 +139,20 @@ public class XmlDataStoreReader extends DataStoreReader {
 	@Override
 	public void exitArray() {
 		checkArray(true);
+		checkLock();
 		active = (Element) active.getParentNode();
 	}
 	@Override
 	public void exitArrayElement() {
 		checkArrayElement(true);
+		checkLock();
 		active = (Element) active.getParentNode();
 	}
 	@Override
 	public void exitComplex() {
 		checkArray(false);
 		checkArrayElement(false);
+		checkLock();
 		active = (Element) active.getParentNode();
 	}
 	@Override
@@ -167,6 +177,47 @@ public class XmlDataStoreReader extends DataStoreReader {
 	}
 	protected boolean isArray() {
 		return isArray(active);
+	}
+	@Override
+	protected boolean isPathLocked(@NotNull ReaderBookmark to) {
+		Element toEl = ((Bookmark) to).place;
+		if(toEl == active) {
+			return false;
+		}
+		List<Element> toPath = new ArrayList<>();
+		toPath.add(((Bookmark) to).place);
+		while(toPath.get(0).getParentNode() instanceof Element) {
+			Element tempTo = (Element) toPath.get(0).getParentNode();
+			if(tempTo == active) {
+				// If the current element is an ancestor of the target element, there can be no relevant locks.
+				return false;
+			}
+			toPath.add(0, tempTo);
+		}
+		List<Element> fromPath = new ArrayList<>();
+		fromPath.add(active);
+		while(fromPath.get(0).getParentNode() instanceof Element) {
+			fromPath.add(0, (Element) fromPath.get(0).getParentNode());
+		}
+		Element commonAncestor = null;
+		int max = Math.min(fromPath.size(), toPath.size());
+		for(int i = 1; i < max; i++) {
+			if(toPath.get(i) != fromPath.get(i)) {
+				commonAncestor = fromPath.get(i - 1);
+				break;
+			}
+		}
+		if(commonAncestor == null && fromPath.get(max) == toEl) {
+			commonAncestor = toEl;
+		}
+		Element tempFrom = active;
+		while(tempFrom != commonAncestor) {
+			if(checkLock(tempFrom)) {
+				return true;
+			}
+			tempFrom = (Element) tempFrom.getParentNode();
+		}
+		return false;
 	}
 	@Override
 	public void loadBookmark(@NotNull ReaderBookmark bookmark) {
@@ -314,6 +365,14 @@ public class XmlDataStoreReader extends DataStoreReader {
 			}
 		}
 		return items.toArray(new String[items.size()]);
+	}
+	@Override
+	protected void registerLock(@NotNull String id) {
+		lockMap.put(id, active);
+	}
+	@Override
+	protected void removeLock(@NotNull String id) {
+		lockMap.remove(id);
 	}
 	private class Bookmark extends ReaderBookmark {
 		private final Element place;

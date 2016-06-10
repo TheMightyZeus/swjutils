@@ -16,8 +16,7 @@ import java.io.IOException;
  * @see DataStoreWriter
  */
 public class MemoryStore {
-	private ByteArrayOutputStream out = new ByteArrayOutputStream();
-	private BinaryDataStoreWriter writer = new BinaryDataStoreWriter(out);
+	private BinaryDataStoreWriter writer = new BinaryDataStoreWriter();
 	private BinaryDataStoreReader reader;
 	/**
 	 * Closes the writer and returns a reader containing the data that's been written. After this method is called,
@@ -28,8 +27,9 @@ public class MemoryStore {
 	 */
 	public @NotNull DataStoreReader getReader() throws IOException {
 		if(reader == null) {
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			writer.save(out);
 			reader = new BinaryDataStoreReader(new ByteArrayInputStream(out.toByteArray()));
-			out = null;
 			writer = null;
 		}
 		return reader;
